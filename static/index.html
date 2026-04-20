@@ -1,533 +1,340 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Qwen Lens Studio</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-<style>
-  :root {
-    --bg: #0a0f1e;
-    --surface: #111827;
-    --surface2: #1f2937;
-    --border: #2d3748;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --purple: #a855f7;
-    --cyan: #06b6d4;
-    --green: #10b981;
-    --orange: #f97316;
-    --red: #ef4444;
-    --blue: #3b82f6;
-  }
-  .light-theme {
-    --bg: #f8fafc;
-    --surface: #ffffff;
-    --surface2: #f1f5f9;
-    --border: #e2e8f0;
-    --text: #1e293b;
-    --muted: #64748b;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
-  header { padding: 1.25rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
-  .logo { display: flex; flex-direction: column; gap: 0.2rem; }
-  .logo h1 { font-size: 1.5rem; font-weight: 700; background: linear-gradient(90deg, var(--purple), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  .logo p { font-size: 0.75rem; color: var(--muted); }
-  .header-right { display: flex; align-items: center; gap: 1rem; }
-  #backend-badge { padding: 0.3rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; background: var(--surface2); border: 1px solid var(--border); }
-  #theme-toggle { background: none; border: 1px solid var(--border); color: var(--text); cursor: pointer; padding: 0.4rem 0.6rem; border-radius: 8px; font-size: 1rem; }
-  #theme-toggle:hover { background: var(--surface2); }
-  .tab-bar { display: flex; gap: 0.5rem; padding: 1rem 2rem; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; }
-  .tab-btn { padding: 0.5rem 1.1rem; border-radius: 9999px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; white-space: nowrap; transition: all 0.2s; }
-  .tab-btn:hover { color: var(--text); border-color: var(--purple); }
-  .tab-btn.active { background: linear-gradient(90deg, var(--purple), var(--cyan)); border-color: transparent; color: #fff; font-weight: 600; }
-  main { padding: 2rem; max-width: 900px; margin: 0 auto; }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-  .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 2.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface); margin-bottom: 1rem; }
-  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--purple); background: var(--surface2); }
-  .upload-zone p { color: var(--muted); font-size: 0.9rem; margin-top: 0.5rem; }
-  .upload-zone .icon { font-size: 2.5rem; }
-  .preview-img { max-width: 100%; max-height: 260px; border-radius: 8px; margin-top: 0.75rem; display: none; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
-  input[type="text"], textarea, select {
-    width: 100%; padding: 0.6rem 0.9rem; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text); font-size: 0.9rem; outline: none;
-  }
-  input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--purple); }
-  .radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-  .radio-group label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.4rem 0.9rem; border-radius: 9999px; border: 1px solid var(--border); font-size: 0.82rem; color: var(--text); margin: 0; }
-  .radio-group input[type="radio"] { display: none; }
-  .radio-group input[type="radio"]:checked + span { color: var(--purple); font-weight: 600; }
-  .radio-group label:has(input:checked) { border-color: var(--purple); background: var(--surface2); }
-  .toggle-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-  .toggle { position: relative; width: 44px; height: 24px; }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: 0.3s; }
-  .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
-  .toggle input:checked + .slider { background: var(--purple); }
-  .toggle input:checked + .slider:before { transform: translateX(20px); }
-  .btn { padding: 0.65rem 1.5rem; border-radius: 9999px; border: none; background: linear-gradient(90deg, var(--purple), var(--cyan)); color: white; font-weight: 600; cursor: pointer; font-size: 0.9rem; transition: opacity 0.2s; width: 100%; margin-top: 0.5rem; }
-  .btn:hover { opacity: 0.9; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .result-box { margin-top: 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .result-box .result-header { padding: 0.75rem 1rem; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 0.82rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
-  .result-content { padding: 1rem; min-height: 80px; line-height: 1.7; font-size: 0.9rem; white-space: pre-wrap; }
-  .thinking-block { margin: 0 1rem 1rem; }
-  .thinking-block summary { cursor: pointer; font-size: 0.82rem; color: var(--muted); padding: 0.5rem; user-select: none; }
-  .thinking-content { padding: 0.75rem; background: var(--surface2); border-radius: 8px; font-size: 0.82rem; color: var(--muted); font-style: italic; white-space: pre-wrap; line-height: 1.6; max-height: 300px; overflow-y: auto; }
-  .spinner { display: none; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.85rem; margin-top: 1rem; }
-  .spinner.show { display: flex; }
-  .spin { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--purple); border-radius: 50%; animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .copy-btn { padding: 0.3rem 0.7rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
-  .copy-btn:hover { border-color: var(--purple); color: var(--purple); }
-  .compare-sections { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; }
-  .compare-section { padding: 1rem; border-radius: 8px; border-left: 4px solid; }
-  .compare-section.similarities { border-left-color: var(--blue); background: rgba(59,130,246,0.07); }
-  .compare-section.differences { border-left-color: var(--orange); background: rgba(249,115,22,0.07); }
-  .compare-section.verdict { border-left-color: var(--green); background: rgba(16,185,129,0.07); }
-  .compare-section h3 { font-size: 0.82rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-  .compare-section.similarities h3 { color: var(--blue); }
-  .compare-section.differences h3 { color: var(--orange); }
-  .compare-section.verdict h3 { color: var(--green); }
-  .lang-select-wrap { position: relative; margin-bottom: 1rem; }
-  .lang-flag { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1.2rem; pointer-events: none; }
-  code[class*="language-"], pre[class*="language-"] { font-size: 0.82rem !important; }
-  pre { border-radius: 8px !important; }
-  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } main { padding: 1rem; } }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen Lens Studio ✦</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-deep: #0f172a;
+            --bg-card: #1e293b;
+            --accent-primary: #a855f7;
+            --accent-secondary: #06b6d4;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --gradient: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        body.light-theme {
+            --bg-deep: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-dim: #64748b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+        body { background: var(--bg-deep); color: var(--text-main); transition: all 0.3s ease; min-height: 100vh; }
+        
+        .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem; }
+        .logo h1 { font-size: 2.5rem; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo p { color: var(--text-dim); margin-top: 0.5rem; }
+
+        .theme-toggle { cursor: pointer; font-size: 1.5rem; background: none; border: none; color: var(--text-main); }
+
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem; }
+        .tab-btn { 
+            padding: 0.75rem 1.5rem; border-radius: 999px; border: 2px solid transparent;
+            background: var(--bg-card); color: var(--text-dim); cursor: pointer; white-space: nowrap;
+            transition: all 0.2s; font-weight: 600;
+        }
+        .tab-btn.active { border-color: var(--accent-primary); color: var(--text-main); background: rgba(168, 85, 247, 0.1); }
+
+        .panel { background: var(--bg-card); border-radius: 1.5rem; padding: 2rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); display: none; }
+        .panel.active { display: block; animation: fadeIn 0.4s ease; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+        .upload-zone { 
+            border: 2px dashed var(--text-dim); border-radius: 1rem; padding: 2rem; text-align: center;
+            cursor: pointer; transition: border-color 0.2s; position: relative; min-height: 200px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .upload-zone:hover { border-color: var(--accent-secondary); }
+        .upload-zone img { max-width: 100%; max-height: 300px; border-radius: 0.5rem; margin-top: 1rem; }
+        .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+        .controls { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+        input[type="text"], select { 
+            padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--text-dim);
+            background: var(--bg-deep); color: var(--text-main); width: 100%;
+        }
+
+        .btn-analyze { 
+            background: var(--gradient); color: white; border: none; padding: 1rem; 
+            border-radius: 0.5rem; font-weight: bold; cursor: pointer; font-size: 1.1rem;
+            transition: transform 0.1s;
+        }
+        .btn-analyze:active { transform: scale(0.98); }
+        .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .result-area { margin-top: 2rem; border-top: 1px solid var(--text-dim); padding-top: 1.5rem; }
+        .thinking-box { 
+            background: rgba(148, 163, 184, 0.1); border-left: 4px solid var(--text-dim);
+            padding: 1rem; margin-bottom: 1rem; font-style: italic; color: var(--text-dim);
+        }
+        .answer-box { line-height: 1.6; white-space: pre-wrap; }
+
+        .dual-result { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .section { padding: 1rem; border-left: 4px solid #ccc; border-radius: 0 0.5rem 0.5rem 0; background: rgba(0,0,0,0.1); }
+        .section-sim { border-color: #3b82f6; }
+        .section-diff { border-color: #f97316; }
+        .section-verdict { border-color: #10b981; }
+
+        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: bold; margin-bottom: 1rem; }
+
+        pre { border-radius: 0.5rem; margin-top: 1rem; max-height: 500px; overflow: auto; }
+        .copy-btn { float: right; padding: 0.25rem 0.5rem; font-size: 0.7rem; cursor: pointer; }
+    </style>
 </head>
 <body>
-<header>
-  <div class="logo">
-    <h1>Qwen Lens Studio ✦</h1>
-    <p>Powered by Qwen3.6-35B-A3B · 73.4% SWE-Bench</p>
-  </div>
-  <div class="header-right">
-    <span id="backend-badge">⏳ loading…</span>
-    <button id="theme-toggle" title="Toggle theme">☀️</button>
-  </div>
-</header>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Qwen Lens Studio ✦</h1>
+                <p>Powered by Qwen3.6-35B-A3B • 73.4% SWE-Bench</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
 
-<div class="tab-bar">
-  <button class="tab-btn active" data-tab="reasoning">🧠 Visual Reasoning</button>
-  <button class="tab-btn" data-tab="multilingual">🌍 Multilingual</button>
-  <button class="tab-btn" data-tab="document-iq">📄 Document IQ</button>
-  <button class="tab-btn" data-tab="code-lens">💻 Code Lens</button>
-  <button class="tab-btn" data-tab="dual-compare">⚖️ Dual Compare</button>
-</div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('reasoning')">Visual Reasoning</button>
+            <button class="tab-btn" onclick="showTab('multilingual')">Multilingual</button>
+            <button class="tab-btn" onclick="showTab('document')">Document IQ</button>
+            <button class="tab-btn" onclick="showTab('code')">Code Lens</button>
+            <button class="tab-btn" onclick="showTab('dual')">Dual Compare</button>
+        </div>
 
-<main>
+        <!-- Reasoning Panel -->
+        <div id="reasoning" class="panel active">
+            <div class="upload-zone" id="drop-reasoning">
+                <span>📸 Drop image or click to upload</span>
+                <input type="file" accept="image/*" onchange="previewImage(this, 'img-reasoning')">
+                <img id="img-reasoning" style="display:none">
+            </div>
+            <div class="controls">
+                <input type="text" id="q-reasoning" placeholder="Ask a complex question about the image...">
+                <label><input type="checkbox" id="check-thinking"> Show Thinking 🧠</label>
+                <button class="btn-analyze" onclick="analyze('reasoning')">Analyze with Qwen</button>
+            </div>
+            <div class="result-area" id="res-reasoning"></div>
+        </div>
 
-<!-- TAB: Visual Reasoning -->
-<div class="tab-panel active" id="tab-reasoning">
-  <div class="upload-zone" id="reasoning-zone">
-    <div class="icon">🖼️</div>
-    <strong>Drop image here or click to upload</strong>
-    <p>PNG, JPG, WEBP supported</p>
-    <img class="preview-img" id="reasoning-preview">
-  </div>
-  <input type="file" id="reasoning-file" accept="image/*" hidden>
-  <label>Your question</label>
-  <input type="text" id="reasoning-question" value="What is in this image? Describe it in detail." style="margin-bottom:1rem">
-  <div class="toggle-row">
-    <label class="toggle">
-      <input type="checkbox" id="show-thinking">
-      <span class="slider"></span>
-    </label>
-    <span style="font-size:0.85rem">Show chain-of-thought thinking 🧠</span>
-  </div>
-  <button class="btn" id="reasoning-btn">Analyze with Qwen</button>
-  <div class="spinner" id="reasoning-spinner"><div class="spin"></div> Qwen is thinking…</div>
-  <div class="result-box" id="reasoning-result" style="display:none">
-    <div class="result-header"><span>Response</span></div>
-    <details class="thinking-block" id="thinking-details" style="display:none">
-      <summary>🧠 Chain-of-thought reasoning</summary>
-      <div class="thinking-content" id="thinking-text"></div>
-    </details>
-    <div class="result-content" id="reasoning-output"></div>
-  </div>
-</div>
+        <!-- Multilingual Panel -->
+        <div id="multilingual" class="panel">
+            <div class="upload-zone">
+                <span>📸 Drop image or click to upload</span>
+                <input type="file" accept="image/*" onchange="previewImage(this, 'img-multi')">
+                <img id="img-multi" style="display:none">
+            </div>
+            <div class="controls">
+                <select id="lang-multi">
+                    <option value="en">English 🇺🇸</option>
+                    <option value="zh">中文 🇨🇳</option>
+                    <option value="ja">日本語 🇯🇵</option>
+                    <option value="es">Spanish 🇪🇸</option>
+                    <option value="fr">French 🇫🇷</option>
+                    <option value="de">German 🇩🇪</option>
+                    <option value="ar">Arabic 🇸🇦</option>
+                    <option value="hi">Hindi 🇮🇳</option>
+                    <option value="ko">Korean 🇰🇷</option>
+                    <option value="pt">Portuguese 🇵🇹</option>
+                    <option value="ru">Russian 🇷🇺</option>
+                </select>
+                <button class="btn-analyze" onclick="analyze('multilingual')">Describe Image</button>
+            </div>
+            <div class="result-area" id="res-multi"></div>
+        </div>
 
-<!-- TAB: Multilingual -->
-<div class="tab-panel" id="tab-multilingual">
-  <div class="upload-zone" id="multilingual-zone">
-    <div class="icon">🌍</div>
-    <strong>Drop image here or click to upload</strong>
-    <p>Get a description in any language</p>
-    <img class="preview-img" id="multilingual-preview">
-  </div>
-  <input type="file" id="multilingual-file" accept="image/*" hidden>
-  <label>Language</label>
-  <div class="lang-select-wrap">
-    <select id="language-select" style="margin-bottom:1rem;padding-right:2.5rem">
-      <option value="en">🇺🇸 English</option>
-      <option value="zh">🇨🇳 中文</option>
-      <option value="ja">🇯🇵 日本語</option>
-      <option value="es">🇪🇸 Spanish</option>
-      <option value="fr">🇫🇷 French</option>
-      <option value="de">🇩🇪 German</option>
-      <option value="ar">🇸🇦 Arabic</option>
-      <option value="hi">🇮🇳 Hindi</option>
-      <option value="ko">🇰🇷 Korean</option>
-      <option value="pt">🇵🇹 Portuguese</option>
-      <option value="ru">🇷🇺 Russian</option>
-    </select>
-  </div>
-  <button class="btn" id="multilingual-btn">Describe Image</button>
-  <div class="spinner" id="multilingual-spinner"><div class="spin"></div> Qwen is thinking…</div>
-  <div class="result-box" id="multilingual-result" style="display:none">
-    <div class="result-header"><span id="multilingual-lang-label">Description</span></div>
-    <div class="result-content" id="multilingual-output"></div>
-  </div>
-</div>
+        <!-- Document Panel -->
+        <div id="document" class="panel">
+            <div class="upload-zone">
+                <span>📄 Upload Invoice, Receipt, or ID</span>
+                <input type="file" accept="image/*" onchange="previewImage(this, 'img-doc')">
+                <img id="img-doc" style="display:none">
+            </div>
+            <div class="controls">
+                <button class="btn-analyze" onclick="analyze('document')">Extract Data</button>
+            </div>
+            <div class="result-area" id="res-doc"></div>
+        </div>
 
-<!-- TAB: Document IQ -->
-<div class="tab-panel" id="tab-document-iq">
-  <div class="upload-zone" id="document-zone">
-    <div class="icon">📄</div>
-    <strong>Drop document image here</strong>
-    <p>Invoice, receipt, business card, form, ID card…</p>
-    <img class="preview-img" id="document-preview">
-  </div>
-  <input type="file" id="document-file" accept="image/*" hidden>
-  <button class="btn" id="document-btn">Extract Data</button>
-  <div class="spinner" id="document-spinner"><div class="spin"></div> Qwen is thinking…</div>
-  <div class="result-box" id="document-result" style="display:none">
-    <div class="result-header">
-      <span>Extracted JSON <span id="doc-type-badge" style="margin-left:.5rem;padding:.2rem .6rem;border-radius:9999px;font-size:.7rem;font-weight:700;background:var(--purple);color:white"></span></span>
-      <button class="copy-btn" id="document-copy">Copy JSON</button>
+        <!-- Code Panel -->
+        <div id="code" class="panel">
+            <div class="upload-zone">
+                <span>🖼️ Upload UI Screenshot</span>
+                <input type="file" accept="image/*" onchange="previewImage(this, 'img-code')">
+                <img id="img-code" style="display:none">
+            </div>
+            <div class="controls">
+                <div style="display:flex; gap:1rem">
+                    <label><input type="radio" name="fw" value="html" checked> HTML/CSS</label>
+                    <label><input type="radio" name="fw" value="react"> React + Tailwind</label>
+                    <label><input type="radio" name="fw" value="vue"> Vue 3</label>
+                    <label><input type="radio" name="fw" value="svelte"> Svelte</label>
+                </div>
+                <button class="btn-analyze" onclick="analyze('code')">Generate Code</button>
+            </div>
+            <div class="result-area" id="res-code"></div>
+        </div>
+
+        <!-- Dual Panel -->
+        <div id="dual" class="panel">
+            <div class="upload-grid">
+                <div class="upload-zone">
+                    <span>🖼️ Image 1</span>
+                    <input type="file" id="dual-1" accept="image/*" onchange="previewImage(this, 'img-dual-1')">
+                    <img id="img-dual-1" style="display:none">
+                </div>
+                <div class="upload-zone">
+                    <span>🖼️ Image 2</span>
+                    <input type="file" id="dual-2" accept="image/*" onchange="previewImage(this, 'img-dual-2')">
+                    <img id="img-dual-2" style="display:none">
+                </div>
+            </div>
+            <div class="controls">
+                <input type="text" id="q-dual" placeholder="Compare these images...">
+                <button class="btn-analyze" onclick="analyze('dual')">Compare Images</button>
+            </div>
+            <div class="result-area" id="res-dual"></div>
+        </div>
     </div>
-    <pre class="result-content" style="padding:0"><code class="language-json" id="document-output"></code></pre>
-  </div>
-</div>
 
-<!-- TAB: Code Lens -->
-<div class="tab-panel" id="tab-code-lens">
-  <div class="upload-zone" id="code-zone">
-    <div class="icon">💻</div>
-    <strong>Drop UI screenshot or wireframe</strong>
-    <p>Qwen generates production-ready code</p>
-    <img class="preview-img" id="code-preview">
-  </div>
-  <input type="file" id="code-file" accept="image/*" hidden>
-  <label>Output framework</label>
-  <div class="radio-group">
-    <label><input type="radio" name="framework" value="html" checked><span>HTML / CSS</span></label>
-    <label><input type="radio" name="framework" value="react"><span>React + Tailwind</span></label>
-    <label><input type="radio" name="framework" value="vue"><span>Vue 3</span></label>
-    <label><input type="radio" name="framework" value="svelte"><span>Svelte</span></label>
-  </div>
-  <button class="btn" id="code-btn">Generate Code</button>
-  <div class="spinner" id="code-spinner"><div class="spin"></div> Qwen is thinking…</div>
-  <div class="result-box" id="code-result" style="display:none">
-    <div class="result-header">
-      <span id="code-lang-label">Generated Code</span>
-      <button class="copy-btn" id="code-copy">Copy Code</button>
-    </div>
-    <pre class="result-content" style="padding:0"><code id="code-output"></code></pre>
-  </div>
-</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
 
-<!-- TAB: Dual Compare -->
-<div class="tab-panel" id="tab-dual-compare">
-  <div class="two-col">
-    <div>
-      <label>Image 1</label>
-      <div class="upload-zone" id="compare-zone1">
-        <div class="icon">🖼️</div>
-        <strong>First image</strong>
-        <img class="preview-img" id="compare-preview1">
-      </div>
-      <input type="file" id="compare-file1" accept="image/*" hidden>
-    </div>
-    <div>
-      <label>Image 2</label>
-      <div class="upload-zone" id="compare-zone2">
-        <div class="icon">🖼️</div>
-        <strong>Second image</strong>
-        <img class="preview-img" id="compare-preview2">
-      </div>
-      <input type="file" id="compare-file2" accept="image/*" hidden>
-    </div>
-  </div>
-  <label>Comparison question</label>
-  <input type="text" id="compare-question" value="What are the main differences between these two images?" style="margin-bottom:.5rem">
-  <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem">
-    <button class="copy-btn" onclick="document.getElementById('compare-question').value='Which design is more user-friendly?'">User-friendly?</button>
-    <button class="copy-btn" onclick="document.getElementById('compare-question').value='What changed between these versions?'">What changed?</button>
-    <button class="copy-btn" onclick="document.getElementById('compare-question').value='Which product looks higher quality?'">Higher quality?</button>
-    <button class="copy-btn" onclick="document.getElementById('compare-question').value='Which has better composition?'">Composition?</button>
-  </div>
-  <button class="btn" id="compare-btn">Compare Images</button>
-  <div class="spinner" id="compare-spinner"><div class="spin"></div> Qwen is thinking…</div>
-  <div id="compare-result" style="display:none">
-    <div class="compare-sections">
-      <div class="compare-section similarities"><h3>Similarities</h3><div id="cmp-similarities"></div></div>
-      <div class="compare-section differences"><h3>Differences</h3><div id="cmp-differences"></div></div>
-      <div class="compare-section verdict"><h3>Verdict</h3><div id="cmp-verdict"></div></div>
-    </div>
-  </div>
-</div>
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+            const btn = document.querySelector('.theme-toggle');
+            btn.innerText = document.body.classList.contains('light-theme') ? '☀️' : '🌙';
+            localStorage.setItem('theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+        }
 
-</main>
+        if(localStorage.getItem('theme') === 'light') toggleTheme();
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
-<script>
-// Theme toggle
-const saved = localStorage.getItem('theme');
-if (saved === 'light') document.body.classList.add('light-theme');
-document.getElementById('theme-toggle').addEventListener('click', () => {
-  document.body.classList.toggle('light-theme');
-  localStorage.setItem('theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
-  document.getElementById('theme-toggle').textContent = document.body.classList.contains('light-theme') ? '🌙' : '☀️';
-});
-if (saved === 'light') document.getElementById('theme-toggle').textContent = '🌙';
+        function showTab(tabId) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
 
-// Backend badge
-fetch('/api/health').then(r => r.json()).then(d => {
-  const badge = document.getElementById('backend-badge');
-  const labels = { openrouter: '☁️ OpenRouter', ollama: '🦙 Ollama', llamacpp: '⚡ llama.cpp' };
-  const colors = { openrouter: '#a855f7', ollama: '#10b981', llamacpp: '#f97316' };
-  const b = d.mock_mode ? 'mock' : d.backend;
-  badge.textContent = d.mock_mode ? '🧪 Mock' : (labels[d.backend] || d.backend);
-  badge.style.borderColor = d.mock_mode ? '#6b7280' : (colors[d.backend] || '#6b7280');
-  badge.style.color = d.mock_mode ? '#6b7280' : (colors[d.backend] || '#6b7280');
-}).catch(() => {
-  document.getElementById('backend-badge').textContent = '⚠️ Offline';
-});
+        function previewImage(input, imgId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = document.getElementById(imgId);
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    input.parentElement.querySelector('span').style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
 
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
-});
+        async function analyze(type) {
+            const resArea = document.getElementById(`res-${type === 'multilingual' ? 'multi' : type === 'document' ? 'doc' : type}`);
+            resArea.innerHTML = '<div class="thinking-box">Qwen is thinking...</div>';
+            
+            const formData = new FormData();
+            let url = `/api/${type === 'document' ? 'document-iq' : type === 'code' ? 'code-lens' : type}`;
+            
+            if (type === 'dual') {
+                formData.append('image1', document.getElementById('dual-1').files[0]);
+                formData.append('image2', document.getElementById('dual-2').files[0]);
+                formData.append('question', document.getElementById('q-dual').value);
+            } else {
+                const input = document.querySelector(`#${type === 'document' ? 'document' : type} input[type="file"]`);
+                formData.append('image', input.files[0]);
+                
+                if (type === 'reasoning') {
+                    formData.append('question', document.getElementById('q-reasoning').value);
+                    formData.append('show_thinking', document.getElementById('check-thinking').checked);
+                } else if (type === 'multilingual') {
+                    formData.append('language', document.getElementById('lang-multi').value);
+                    url = '/api/multilingual';
+                } else if (type === 'code') {
+                    formData.append('framework', document.querySelector('input[name="fw"]:checked').value);
+                }
+            }
 
-// Upload zone setup
-function setupUpload(zoneId, fileId, previewId) {
-  const zone = document.getElementById(zoneId);
-  const file = document.getElementById(fileId);
-  const preview = document.getElementById(previewId);
-  zone.addEventListener('click', () => file.click());
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault(); zone.classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) { file.files = e.dataTransfer.files; showPreview(e.dataTransfer.files[0], preview); }
-  });
-  file.addEventListener('change', () => { if (file.files[0]) showPreview(file.files[0], preview); });
-}
-function showPreview(f, img) {
-  const reader = new FileReader();
-  reader.onload = e => { img.src = e.target.result; img.style.display = 'block'; };
-  reader.readAsDataURL(f);
-}
-setupUpload('reasoning-zone', 'reasoning-file', 'reasoning-preview');
-setupUpload('multilingual-zone', 'multilingual-file', 'multilingual-preview');
-setupUpload('document-zone', 'document-file', 'document-preview');
-setupUpload('code-zone', 'code-file', 'code-preview');
-setupUpload('compare-zone1', 'compare-file1', 'compare-preview1');
-setupUpload('compare-zone2', 'compare-file2', 'compare-preview2');
+            try {
+                const response = await fetch(url, { method: 'POST', body: formData });
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                let thinkingContent = "";
+                let answerContent = "";
+                resArea.innerHTML = ""; // Clear loader
 
-// SSE streaming helper
-async function streamSSE(url, formData, onThinking, onAnswer, onDone, onError) {
-  const response = await fetch(url, { method: 'POST', body: formData });
-  if (!response.ok) { onError('Request failed: ' + response.status); return; }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split('\n');
-    buf = lines.pop();
-    let currentEvent = 'answer';
-    for (const line of lines) {
-      if (line.startsWith('event: ')) { currentEvent = line.slice(7).trim(); }
-      else if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        if (data === '[DONE]') { onDone(); return; }
-        if (currentEvent === 'thinking') onThinking(data);
-        else if (currentEvent === 'error') onError(data);
-        else onAnswer(data);
-      }
-    }
-  }
-  onDone();
-}
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('event: thinking')) {
+                            const data = JSON.parse(lines[lines.indexOf(line) + 1].replace('data: ', ''));
+                            thinkingContent += data;
+                            updateReasoningUI(resArea, thinkingContent, answerContent);
+                        } else if (line.startsWith('event: answer')) {
+                            const data = JSON.parse(lines[lines.indexOf(line) + 1].replace('data: ', ''));
+                            answerContent += data;
+                            updateReasoningUI(resArea, thinkingContent, answerContent);
+                        } else if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.replace('data: ', ''));
+                            answerContent += data;
+                            if (type === 'document') {
+                                resArea.innerHTML = `<pre><code class="language-json">${answerContent}</code></pre>`;
+                                Prism.highlightAll();
+                            } else if (type === 'code') {
+                                resArea.innerHTML = `<pre><code class="language-javascript">${answerContent}</code></pre>`;
+                                Prism.highlightAll();
+                            } else if (type === 'dual') {
+                                resArea.innerHTML = formatDual(answerContent);
+                            } else {
+                                resArea.innerHTML = `<div class="answer-box">${answerContent}</div>`;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                resArea.innerHTML = `<div style="color:red">Error: ${e.message}</div>`;
+            }
+        }
 
-function setLoading(btnId, spinnerId, loading) {
-  document.getElementById(btnId).disabled = loading;
-  const sp = document.getElementById(spinnerId);
-  if (loading) sp.classList.add('show'); else sp.classList.remove('show');
-}
+        function updateReasoningUI(container, thinking, answer) {
+            let html = "";
+            if (thinking) {
+                html += `<details open class="thinking-box"><summary>🧠 Thinking Process</summary>${thinking}</details>`;
+            }
+            if (answer) {
+                html += `<div class="answer-box">${answer}</div>`;
+            }
+            container.innerHTML = html;
+        }
 
-// TAB 1: Visual Reasoning
-document.getElementById('reasoning-btn').addEventListener('click', async () => {
-  const file = document.getElementById('reasoning-file').files[0];
-  if (!file) { alert('Please upload an image.'); return; }
-  const question = document.getElementById('reasoning-question').value;
-  const showThinking = document.getElementById('show-thinking').checked;
-  const fd = new FormData();
-  fd.append('image', file);
-  fd.append('question', question);
-  fd.append('show_thinking', showThinking);
-  setLoading('reasoning-btn', 'reasoning-spinner', true);
-  const result = document.getElementById('reasoning-result');
-  const output = document.getElementById('reasoning-output');
-  const thinkingDetails = document.getElementById('thinking-details');
-  const thinkingText = document.getElementById('thinking-text');
-  result.style.display = 'block';
-  output.textContent = '';
-  thinkingText.textContent = '';
-  thinkingDetails.style.display = 'none';
-  await streamSSE('/api/reasoning', fd,
-    t => { thinkingDetails.style.display = 'block'; thinkingText.textContent += t; },
-    a => { output.textContent += a; },
-    () => setLoading('reasoning-btn', 'reasoning-spinner', false),
-    e => { output.textContent = '⚠️ ' + e; setLoading('reasoning-btn', 'reasoning-spinner', false); }
-  );
-});
-
-// TAB 2: Multilingual
-const langFlags = { en:'🇺🇸',zh:'🇨🇳',ja:'🇯🇵',es:'🇪🇸',fr:'🇫🇷',de:'🇩🇪',ar:'🇸🇦',hi:'🇮🇳',ko:'🇰🇷',pt:'🇵🇹',ru:'🇷🇺' };
-const langNames = { en:'English',zh:'中文',ja:'日本語',es:'Spanish',fr:'French',de:'German',ar:'Arabic',hi:'Hindi',ko:'Korean',pt:'Portuguese',ru:'Russian' };
-document.getElementById('multilingual-btn').addEventListener('click', async () => {
-  const file = document.getElementById('multilingual-file').files[0];
-  if (!file) { alert('Please upload an image.'); return; }
-  const lang = document.getElementById('language-select').value;
-  const fd = new FormData();
-  fd.append('image', file);
-  fd.append('language', lang);
-  setLoading('multilingual-btn', 'multilingual-spinner', true);
-  const result = document.getElementById('multilingual-result');
-  const output = document.getElementById('multilingual-output');
-  result.style.display = 'block';
-  output.textContent = '';
-  document.getElementById('multilingual-lang-label').textContent = (langFlags[lang] || '') + ' ' + (langNames[lang] || lang);
-  await streamSSE('/api/multilingual', fd,
-    () => {},
-    a => { output.textContent += a; },
-    () => setLoading('multilingual-btn', 'multilingual-spinner', false),
-    e => { output.textContent = '⚠️ ' + e; setLoading('multilingual-btn', 'multilingual-spinner', false); }
-  );
-});
-
-// TAB 3: Document IQ
-let documentJsonBuffer = '';
-document.getElementById('document-btn').addEventListener('click', async () => {
-  const file = document.getElementById('document-file').files[0];
-  if (!file) { alert('Please upload a document image.'); return; }
-  const fd = new FormData();
-  fd.append('image', file);
-  setLoading('document-btn', 'document-spinner', true);
-  const result = document.getElementById('document-result');
-  const output = document.getElementById('document-output');
-  result.style.display = 'block';
-  output.textContent = '';
-  documentJsonBuffer = '';
-  await streamSSE('/api/document-iq', fd,
-    () => {},
-    a => { documentJsonBuffer += a; output.textContent = documentJsonBuffer; },
-    () => {
-      setLoading('document-btn', 'document-spinner', false);
-      try {
-        const parsed = JSON.parse(documentJsonBuffer);
-        output.textContent = JSON.stringify(parsed, null, 2);
-        const dt = parsed.document_type || 'unknown';
-        document.getElementById('doc-type-badge').textContent = dt.replace(/_/g,' ').toUpperCase();
-      } catch {}
-      Prism.highlightElement(output);
-    },
-    e => { output.textContent = '⚠️ ' + e; setLoading('document-btn', 'document-spinner', false); }
-  );
-});
-document.getElementById('document-copy').addEventListener('click', () => {
-  navigator.clipboard.writeText(documentJsonBuffer);
-  document.getElementById('document-copy').textContent = 'Copied!';
-  setTimeout(() => document.getElementById('document-copy').textContent = 'Copy JSON', 1500);
-});
-
-// TAB 4: Code Lens
-let codeBuffer = '';
-const fwLang = { html:'markup', react:'jsx', vue:'javascript', svelte:'javascript' };
-document.getElementById('code-btn').addEventListener('click', async () => {
-  const file = document.getElementById('code-file').files[0];
-  if (!file) { alert('Please upload a screenshot.'); return; }
-  const framework = document.querySelector('input[name="framework"]:checked').value;
-  const fd = new FormData();
-  fd.append('image', file);
-  fd.append('framework', framework);
-  setLoading('code-btn', 'code-spinner', true);
-  const result = document.getElementById('code-result');
-  const output = document.getElementById('code-output');
-  result.style.display = 'block';
-  output.textContent = '';
-  codeBuffer = '';
-  output.className = 'language-' + (fwLang[framework] || 'markup');
-  document.getElementById('code-lang-label').textContent = { html:'HTML/CSS', react:'React + Tailwind', vue:'Vue 3', svelte:'Svelte' }[framework];
-  await streamSSE('/api/code-lens', fd,
-    () => {},
-    a => { codeBuffer += a; output.textContent = codeBuffer; },
-    () => { setLoading('code-btn', 'code-spinner', false); Prism.highlightElement(output); },
-    e => { output.textContent = '⚠️ ' + e; setLoading('code-btn', 'code-spinner', false); }
-  );
-});
-document.getElementById('code-copy').addEventListener('click', () => {
-  navigator.clipboard.writeText(codeBuffer);
-  document.getElementById('code-copy').textContent = 'Copied!';
-  setTimeout(() => document.getElementById('code-copy').textContent = 'Copy Code', 1500);
-});
-
-// TAB 5: Dual Compare
-let compareBuffer = '';
-document.getElementById('compare-btn').addEventListener('click', async () => {
-  const f1 = document.getElementById('compare-file1').files[0];
-  const f2 = document.getElementById('compare-file2').files[0];
-  if (!f1 || !f2) { alert('Please upload both images.'); return; }
-  const question = document.getElementById('compare-question').value;
-  const fd = new FormData();
-  fd.append('image1', f1);
-  fd.append('image2', f2);
-  fd.append('question', question);
-  setLoading('compare-btn', 'compare-spinner', true);
-  const result = document.getElementById('compare-result');
-  result.style.display = 'none';
-  compareBuffer = '';
-  document.getElementById('cmp-similarities').textContent = '';
-  document.getElementById('cmp-differences').textContent = '';
-  document.getElementById('cmp-verdict').textContent = '';
-  await streamSSE('/api/dual-compare', fd,
-    () => {},
-    a => {
-      compareBuffer += a;
-      result.style.display = 'block';
-      parseCompare(compareBuffer);
-    },
-    () => setLoading('compare-btn', 'compare-spinner', false),
-    e => { compareBuffer = '⚠️ ' + e; result.style.display = 'block'; document.getElementById('cmp-similarities').textContent = compareBuffer; setLoading('compare-btn', 'compare-spinner', false); }
-  );
-});
-function parseCompare(text) {
-  const simMatch = text.match(/##\s*Similarities\s*\n([\s\S]*?)(?=##\s*Differences|$)/i);
-  const diffMatch = text.match(/##\s*Differences\s*\n([\s\S]*?)(?=##\s*Verdict|$)/i);
-  const verdMatch = text.match(/##\s*Verdict\s*\n([\s\S]*)$/i);
-  document.getElementById('cmp-similarities').textContent = simMatch ? simMatch[1].trim() : text;
-  document.getElementById('cmp-differences').textContent = diffMatch ? diffMatch[1].trim() : '';
-  document.getElementById('cmp-verdict').textContent = verdMatch ? verdMatch[1].trim() : '';
-}
-</script>
+        function formatDual(text) {
+            const sections = { sim: "", diff: "", verd: "" };
+            const simMatch = text.match(/## Similarities\n([\s\S]*?)(?=## Differences|$)/i);
+            const diffMatch = text.match(/## Differences\n([\s\S]*?)(?=## Verdict|$)/i);
+            const verdMatch = text.match(/## Verdict\n([\s\S]*?)$/i);
+            
+            return `
+                <div class="dual-result">
+                    <div class="section section-sim"><h3>Similarities</h3>${simMatch ? simMatch[1] : ''}</div>
+                    <div class="section section-diff"><h3>Differences</h3>${diffMatch ? diffMatch[1] : ''}</div>
+                    <div class="section section-verdict"><h3>Verdict</h3>${verdMatch ? verdMatch[1] : ''}</div>
+                </div>
+            `;
+        }
+    </script>
 </body>
 </html>
