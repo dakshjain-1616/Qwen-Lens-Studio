@@ -38,14 +38,22 @@ document_proc = DocumentIQProcessor()
 code_proc = CodeLensProcessor()
 dual_proc = DualCompareProcessor()
 
-# Static files
+# Static files (legacy fallback)
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+SPA_DIR = "frontend/dist"
+SPA_INDEX = os.path.join(SPA_DIR, "index.html")
+NO_CACHE_HTML = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+def _serve_index() -> HTMLResponse:
+    path = SPA_INDEX if os.path.exists(SPA_INDEX) else "static/index.html"
+    with open(path, "r") as f:
+        return HTMLResponse(content=f.read(), headers=NO_CACHE_HTML)
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
-    with open("static/index.html", "r") as f:
-        return f.read()
+    return _serve_index()
 
 @app.get("/api/health")
 async def health():
@@ -175,6 +183,19 @@ async def dual_compare(
             yield f"data: {json.dumps(chunk)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.get("/{spa_path:path}", response_class=HTMLResponse)
+async def spa_fallback(spa_path: str):
+    # Serve hashed assets from the Vite build if requested
+    asset_path = os.path.join(SPA_DIR, spa_path)
+    if os.path.isfile(asset_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(asset_path)
+    # Otherwise let the SPA router handle the path
+    if os.path.exists(SPA_INDEX):
+        return _serve_index()
+    raise HTTPException(status_code=404, detail="Not found")
+
 
 if __name__ == "__main__":
     import uvicorn

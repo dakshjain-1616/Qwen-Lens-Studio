@@ -10,7 +10,7 @@ load_dotenv()
 class QwenClient:
     def __init__(self):
         self.api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("MODEL_ID", "qwen/qwen3.6-35b-a3b")
+        self.model = os.getenv("MODEL_ID") or os.getenv("QWEN_MODEL") or "qwen/qwen3.6-plus"
         self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
         self.backend = os.getenv("BACKEND", "openrouter").lower() # openrouter, ollama, llamacpp
         
@@ -26,7 +26,8 @@ class QwenClient:
         enable_thinking: bool = False
     ) -> AsyncGenerator[str, None]:
         if self.mock_mode:
-            yield from self._mock_stream(enable_thinking)
+            async for chunk in self._mock_stream(enable_thinking):
+                yield chunk
             return
 
         url = f"{self.base_urls.get(self.backend, self.base_urls['openrouter'])}/chat/completions"
@@ -58,10 +59,14 @@ class QwenClient:
                             break
                         try:
                             data = json.loads(data_str)
-                            chunk = data["choices"][0]["delta"].get("content", "")
+                            choices = data.get("choices") or []
+                            if not choices:
+                                continue
+                            delta = choices[0].get("delta") or {}
+                            chunk = delta.get("content") or ""
                             if chunk:
                                 yield chunk
-                        except json.JSONDecodeError:
+                        except (json.JSONDecodeError, KeyError, IndexError):
                             continue
 
     async def _mock_stream(self, enable_thinking: bool) -> AsyncGenerator[str, None]:

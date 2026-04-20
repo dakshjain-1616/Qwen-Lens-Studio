@@ -37,3 +37,8 @@ logs/
 
 # Plans (Neo internal)
 plans/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+

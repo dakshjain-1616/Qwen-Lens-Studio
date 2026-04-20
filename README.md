@@ -2,12 +2,20 @@
 
 Multimodal AI Studio powered by Qwen3.6-35B-A3B.
 
+![Qwen Lens Studio home](Screenshots/home.png)
+
 ## Features
 - **Visual Reasoning**: Chain-of-thought analysis with "Show Thinking" toggle.
 - **Multilingual Describe**: Image descriptions in 11 languages.
 - **Document IQ**: Structured JSON extraction from documents.
 - **Code Lens**: UI screenshot to React/Vue/Svelte/HTML code.
 - **Dual Compare**: Side-by-side analysis of two images.
+
+### Visual Reasoning
+![Visual Reasoning](Screenshots/reasoning.png)
+
+### Code Lens
+![Code Lens](Screenshots/code-lens.png)
 
 ## Setup
 1. Clone the repository.
@@ -20,10 +28,28 @@ Multimodal AI Studio powered by Qwen3.6-35B-A3B.
    cp .env.example .env
    # Add your OPENROUTER_API_KEY
    ```
-4. Run the application:
+4. Build the frontend (React + Vite SPA):
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   cd ..
+   ```
+5. Run the application:
    ```bash
    uvicorn app:app --reload
    ```
+   Open http://localhost:8000 to use the new Qwen Lens Studio UI.
+
+### Frontend dev mode
+For hot-reloading while editing the UI:
+```bash
+# terminal 1 — backend
+uvicorn app:app --reload --port 8000
+# terminal 2 — frontend (proxies /api → :8000)
+cd frontend && npm run dev
+```
+Then visit http://localhost:5173.
 
 ## Model Info
 - **Model**: Qwen 3.6 35B A3B
