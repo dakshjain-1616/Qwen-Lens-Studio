@@ -20,7 +20,7 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
-
+node_modules/ 
 # IDE
 .vscode/
 .idea/
