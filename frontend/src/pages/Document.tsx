@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GlassCard from '../components/GlassCard';
 import ImageDropzone from '../components/ImageDropzone';
 import PageHeader from '../components/PageHeader';
@@ -6,9 +6,11 @@ import StreamButton from '../components/StreamButton';
 import EmptyState from '../components/EmptyState';
 import StageChip from '../components/StageChip';
 import JsonTree from '../components/JsonTree';
+import ExportMenu from '../components/ExportMenu';
 import { useToolRun, compressImage } from '../lib/useToolRun';
 import { useAppStore } from '../store/useAppStore';
-import { TOOLS } from '../lib/types';
+import { TOOLS, type HistoryEntry } from '../lib/types';
+import { makeId } from '../lib/history';
 
 const TOOL = TOOLS.find((t) => t.id === 'document')!;
 
@@ -20,6 +22,16 @@ export default function DocumentPage() {
     tool: 'document',
   });
   const consumeRestore = useAppStore((s) => s.consumeRestore);
+  const resultCardRef = useRef<HTMLDivElement>(null);
+
+  const entry: HistoryEntry = {
+    id: makeId(),
+    tool: 'document',
+    createdAt: Date.now(),
+    title: file?.name || 'Document extract',
+    inputs: { thumbs: [] },
+    output: { answer },
+  };
 
   useEffect(() => {
     const e = consumeRestore();
@@ -72,7 +84,10 @@ export default function DocumentPage() {
 
         <GlassCard padded={false}>
           <div className="p-6">
-            <StageChip stage={stage} />
+            <div className="flex items-start justify-between mb-2">
+              <StageChip stage={stage} />
+              {answer && <ExportMenu entry={entry} elementRef={resultCardRef} />}
+            </div>
             {error && (
               <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 px-4 py-3 mb-4 text-sm">
                 {error}
@@ -85,7 +100,9 @@ export default function DocumentPage() {
                 hint="Upload a document image. Extracted fields render as a collapsible tree you can copy."
               />
             ) : (
-              <JsonTree text={answer} />
+              <div ref={resultCardRef}>
+                <JsonTree text={answer} />
+              </div>
             )}
           </div>
         </GlassCard>

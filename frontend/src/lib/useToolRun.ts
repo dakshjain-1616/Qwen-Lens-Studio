@@ -4,6 +4,8 @@ export { compressImage };
 import { makeId } from './history';
 import { useAppStore } from '../store/useAppStore';
 import type { HistoryEntry, RunStage, ToolId } from './types';
+import { getCached, setCached } from './cache';
+import { getConfig } from './config';
 
 interface Options {
   url: string;
@@ -11,13 +13,22 @@ interface Options {
   supportsThinking?: boolean;
 }
 
+type RunMeta = {
+  question?: string;
+  language?: string;
+  framework?: string;
+  showThinking?: boolean;
+  thumbs?: string[];
+  title: string;
+};
+
 export function useToolRun({ url, tool, supportsThinking }: Options) {
   const [thinking, setThinking] = useState('');
   const [answer, setAnswer] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<RunStage>('idle');
-  const controllerRef = useRef<AbortController | null>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
   const push = useAppStore((s) => s.pushHistory);
 
   const reset = useCallback(() => {
@@ -33,39 +44,78 @@ export function useToolRun({ url, tool, supportsThinking }: Options) {
   }, [reset]);
 
   const run = useCallback(
-    async (formData: FormData, files: File[], meta: HistoryEntry['inputs'] & { title: string }) => {
+    async (formData: FormData, files: File[], meta: RunMeta) => {
       setLoading(true);
       setStage('uploading');
-      const controller = new AbortController();
-      controllerRef.current = controller;
+
+      const cacheEnabled = getConfig().cacheEnabled !== false; // default on
+      const cacheExtra = `tool=${tool}`;
 
       let thinkingAcc = '';
       let answerAcc = '';
+      let servedFromCache = false;
 
-      await streamForm(
-        url,
-        formData,
-        {
-          onFirstByte: () => setStage('streaming'),
-          onThinking: (d) => {
-            thinkingAcc += d;
-            setThinking(thinkingAcc);
-          },
-          onAnswer: (d) => {
-            answerAcc += d;
-            setAnswer(answerAcc);
-          },
-          onError: (e) => setError(`${e.name}: ${e.message}`),
-          onDone: () => {},
-        },
-        controller.signal
-      );
+      if (cacheEnabled) {
+        const hit = await getCached(formData, cacheExtra);
+        if (hit) {
+          servedFromCache = true;
+          thinkingAcc = hit.thinking ?? '';
+          answerAcc = hit.answer;
+          setThinking(thinkingAcc);
+          setAnswer(answerAcc);
+          setStage('idle');
+          setLoading(false);
+        }
+      }
 
-      setLoading(false);
-      setStage('idle');
+      if (!servedFromCache) {
+        let finished = false;
+        await new Promise<void>((resolve) => {
+          const handle = streamForm(url, formData, {
+            onFirstByte: () => setStage('streaming'),
+            onThinking: (d) => {
+              thinkingAcc += d;
+              setThinking(thinkingAcc);
+            },
+            onAnswer: (d) => {
+              answerAcc += d;
+              setAnswer(answerAcc);
+            },
+            onError: (e) => {
+              setError(`${e.name}: ${e.message}`);
+              if (!finished) {
+                finished = true;
+                resolve();
+              }
+            },
+            onDone: () => {
+              if (!finished) {
+                finished = true;
+                resolve();
+              }
+            },
+          });
+          cancelRef.current = handle.cancel;
+        });
+
+        cancelRef.current = null;
+        setLoading(false);
+        setStage('idle');
+
+        if (cacheEnabled && answerAcc && !error) {
+          // Fire-and-forget cache write
+          void setCached(formData, cacheExtra, {
+            tool,
+            thinking: thinkingAcc || undefined,
+            answer: answerAcc,
+          });
+        }
+      }
 
       if (answerAcc || thinkingAcc) {
-        const thumbs = await Promise.all(files.map((f) => makeThumbnail(f).catch(() => '')));
+        const thumbs = await Promise.all(
+          files.map((f) => makeThumbnail(f).catch(() => ''))
+        );
         const entry: HistoryEntry = {
           id: makeId(),
           tool,
@@ -86,11 +136,12 @@ export function useToolRun({ url, tool, supportsThinking }: Options) {
         push(entry);
       }
     },
-    [url, tool, push, reset, supportsThinking]
+    [url, tool, push, supportsThinking, error]
   );
 
   const cancel = useCallback(() => {
-    controllerRef.current?.abort();
+    cancelRef.current?.();
+    cancelRef.current = null;
     setLoading(false);
     setStage('idle');
   }, []);

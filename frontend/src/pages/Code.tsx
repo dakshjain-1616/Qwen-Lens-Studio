@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GlassCard from '../components/GlassCard';
 import ImageDropzone from '../components/ImageDropzone';
 import PageHeader from '../components/PageHeader';
@@ -6,9 +6,11 @@ import StreamButton from '../components/StreamButton';
 import EmptyState from '../components/EmptyState';
 import StageChip from '../components/StageChip';
 import CodePreview from '../components/CodePreview';
+import ExportMenu from '../components/ExportMenu';
 import { useToolRun, compressImage } from '../lib/useToolRun';
 import { useAppStore } from '../store/useAppStore';
-import { TOOLS } from '../lib/types';
+import { TOOLS, type HistoryEntry } from '../lib/types';
+import { makeId } from '../lib/history';
 
 const TOOL = TOOLS.find((t) => t.id === 'code')!;
 
@@ -28,6 +30,16 @@ export default function Code() {
     tool: 'code',
   });
   const consumeRestore = useAppStore((s) => s.consumeRestore);
+  const resultCardRef = useRef<HTMLDivElement>(null);
+
+  const entry: HistoryEntry = {
+    id: makeId(),
+    tool: 'code',
+    createdAt: Date.now(),
+    title: `Code Lens output`,
+    inputs: { framework, thumbs: [] },
+    output: { answer },
+  };
 
   useEffect(() => {
     const e = consumeRestore();
@@ -101,7 +113,10 @@ export default function Code() {
 
         <GlassCard padded={false}>
           <div className="p-6">
-            <StageChip stage={stage} />
+            <div className="flex items-start justify-between mb-2">
+              <StageChip stage={stage} />
+              {answer && <ExportMenu entry={entry} elementRef={resultCardRef} />}
+            </div>
             {error && (
               <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 px-4 py-3 mb-4 text-sm">
                 {error}
@@ -114,7 +129,9 @@ export default function Code() {
                 hint="HTML output gets a live sandboxed preview. Other frameworks show the syntax-highlighted source."
               />
             ) : (
-              <CodePreview text={answer} framework={framework} />
+              <div ref={resultCardRef}>
+                <CodePreview text={answer} framework={framework} />
+              </div>
             )}
           </div>
         </GlassCard>

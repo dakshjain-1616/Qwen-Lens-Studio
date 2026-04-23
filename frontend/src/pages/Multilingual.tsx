@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GlassCard from '../components/GlassCard';
 import ImageDropzone from '../components/ImageDropzone';
 import PageHeader from '../components/PageHeader';
 import StreamButton from '../components/StreamButton';
 import EmptyState from '../components/EmptyState';
 import StageChip from '../components/StageChip';
+import ExportMenu from '../components/ExportMenu';
+import Markdown from '../components/Markdown';
 import { useToolRun, compressImage } from '../lib/useToolRun';
 import { useAppStore } from '../store/useAppStore';
-import { TOOLS } from '../lib/types';
+import { TOOLS, type HistoryEntry } from '../lib/types';
+import { makeId } from '../lib/history';
 
 const TOOL = TOOLS.find((t) => t.id === 'multilingual')!;
 
@@ -35,6 +38,17 @@ export default function Multilingual() {
     tool: 'multilingual',
   });
   const consumeRestore = useAppStore((s) => s.consumeRestore);
+  const resultCardRef = useRef<HTMLDivElement>(null);
+
+  const langMeta = LANGUAGES.find((l) => l.code === lang);
+  const entry: HistoryEntry = {
+    id: makeId(),
+    tool: 'multilingual',
+    createdAt: Date.now(),
+    title: `Multilingual ${langMeta?.label ?? lang}`,
+    inputs: { language: lang, thumbs: [] },
+    output: { answer },
+  };
 
   useEffect(() => {
     const e = consumeRestore();
@@ -54,11 +68,10 @@ export default function Multilingual() {
     fd.append('image', compressed);
     fd.append('language', lang);
     setPreviewOverride(null);
-    const langMeta = LANGUAGES.find((l) => l.code === lang)!;
     run(fd, [compressed], {
       language: lang,
       thumbs: [],
-      title: `Describe in ${langMeta.label}`,
+      title: `Describe in ${langMeta?.label ?? lang}`,
     });
   };
 
@@ -114,7 +127,10 @@ export default function Multilingual() {
         </GlassCard>
 
         <GlassCard>
-          <StageChip stage={stage} />
+          <div className="flex items-start justify-between mb-2">
+            <StageChip stage={stage} />
+            {answer && <ExportMenu entry={entry} elementRef={resultCardRef} />}
+          </div>
           {error && (
             <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 px-4 py-3 mb-4 text-sm">
               {error}
@@ -127,7 +143,7 @@ export default function Multilingual() {
               hint="Pick a language and upload an image to get a detailed multilingual description."
             />
           ) : (
-            <div>
+            <div ref={resultCardRef}>
               <div className="flex items-center justify-between mb-3">
                 <span className="chip bg-cyan-500/20 text-cyan-200">
                   {LANGUAGES.find((l) => l.code === lang)?.flag}{' '}
@@ -137,7 +153,7 @@ export default function Multilingual() {
                   {copied ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
-              <div className="text-slate-100 leading-relaxed whitespace-pre-wrap">{answer}</div>
+              <Markdown text={answer} />
             </div>
           )}
         </GlassCard>

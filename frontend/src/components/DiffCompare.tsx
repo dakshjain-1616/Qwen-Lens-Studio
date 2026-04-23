@@ -1,3 +1,5 @@
+import Markdown from './Markdown';
+
 function extractSection(text: string, head: string, next: string[]): string {
   const nextPattern = next.length ? `(?=##\\s+(?:${next.join('|')})|$)` : '$';
   const re = new RegExp(`##\\s+${head}\\s*\\n([\\s\\S]*?)${nextPattern}`, 'i');
@@ -14,8 +16,8 @@ export default function DiffCompare({ text }: { text: string }) {
   // If no markers, fall back to a single answer block
   if (!sims && !diffs && !verdict) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 whitespace-pre-wrap text-slate-200 leading-relaxed">
-        {text}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <Markdown text={text} />
       </div>
     );
   }
@@ -38,8 +40,8 @@ export default function DiffCompare({ text }: { text: string }) {
           >
             <span>{s.icon}</span> {s.label}
           </div>
-          <div className="p-4 text-slate-200 whitespace-pre-wrap leading-relaxed">
-            {s.body || <span className="text-slate-500 italic">streaming…</span>}
+          <div className="p-4">
+            {s.body ? <Markdown text={s.body} /> : <span className="text-slate-500 italic">streaming…</span>}
           </div>
         </div>
       ))}

@@ -1,55 +1,62 @@
-"""Dual Compare Processor for two-image comparison."""
+"""Dual Compare Processor - compares two images side-by-side."""
+from typing import AsyncGenerator, Optional
 
-import re
-from typing import Dict, List, Tuple
+from qwen_client import get_client, StreamChunk
 
 
 class DualCompareProcessor:
-    """Processor for comparing two images side by side."""
-    
-    def __init__(self):
-        self.system_prompt = (
-            "You are an expert visual comparison analyst. Analyze both images and structure "
-            "your response with exactly these markdown headers:\n"
+    """Processor that compares two images."""
+
+    def get_system_prompt(self) -> str:
+        return (
+            "Compare the two images carefully. Structure the response as "
+            "markdown with three sections:\n\n"
             "## Similarities\n"
             "## Differences\n"
             "## Verdict\n\n"
-            "Be detailed and objective in your analysis."
+            "Be specific and cite visual evidence. Ground every claim in what "
+            "is actually visible in the images."
         )
-    
-    def get_system_prompt(self) -> str:
-        """Get system prompt for dual comparison."""
-        return self.system_prompt
-    
-    def parse_comparison_response(self, text: str) -> Dict[str, str]:
-        """Parse response into Similarities, Differences, and Verdict sections."""
-        sections = {
-            "similarities": "",
-            "differences": "",
-            "verdict": "",
-            "raw": text
-        }
-        
-        # Parse sections using regex
-        sim_match = re.search(r'##\s*Similarities\s*\n(.*?)(?=##\s*Differences|$)', text, re.DOTALL | re.IGNORECASE)
-        diff_match = re.search(r'##\s*Differences\s*\n(.*?)(?=##\s*Verdict|$)', text, re.DOTALL | re.IGNORECASE)
-        verdict_match = re.search(r'##\s*Verdict\s*\n(.*)$', text, re.DOTALL | re.IGNORECASE)
-        
-        if sim_match:
-            sections["similarities"] = sim_match.group(1).strip()
-        if diff_match:
-            sections["differences"] = diff_match.group(1).strip()
-        if verdict_match:
-            sections["verdict"] = verdict_match.group(1).strip()
-        
-        return sections
-    
-    def get_example_questions(self) -> List[str]:
-        """Get pre-filled example comparison questions."""
-        return [
-            "Which design is more user-friendly?",
-            "What changed between these versions?",
-            "Which product looks higher quality?",
-            "Which image has better composition?",
-            "What are the main visual differences?",
+
+    async def process(
+        self,
+        image1_b64: str,
+        image2_b64: str,
+        question: str = "",
+        custom_system_prompt: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncGenerator[StreamChunk, None]:
+        system_prompt = (
+            custom_system_prompt
+            if custom_system_prompt and custom_system_prompt.strip()
+            else self.get_system_prompt()
+        )
+        user_text = question.strip() if question and question.strip() else "Compare these images."
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_text},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image1_b64}"},
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image2_b64}"},
+                    },
+                ],
+            },
         ]
+        client = get_client()
+        async for chunk in client.stream_completion(
+            messages,
+            api_key=api_key,
+            model=model,
+            backend=backend,
+        ):
+            yield chunk

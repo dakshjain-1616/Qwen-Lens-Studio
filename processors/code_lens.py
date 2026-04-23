@@ -1,44 +1,64 @@
-"""Code Lens Processor for UI screenshot to code generation."""
+"""Code Lens Processor - generates front-end code from a UI screenshot."""
+from typing import AsyncGenerator, Optional
 
-from typing import Dict
+from qwen_client import get_client, StreamChunk
+
+
+SUPPORTED_FRAMEWORKS = {
+    "html": "plain HTML + inline CSS",
+    "react": "React with Tailwind classes",
+    "vue": "Vue 3 SFC with Tailwind classes",
+    "svelte": "Svelte with Tailwind classes",
+}
 
 
 class CodeLensProcessor:
-    """Processor for generating code from UI screenshots."""
-    
-    FRAMEWORKS = {
-        "html": {
-            "name": "HTML/CSS",
-            "prompt": "Generate clean semantic HTML5 + CSS. Use CSS variables for theming.",
-            "language": "html",
-        },
-        "react": {
-            "name": "React + Tailwind",
-            "prompt": "Generate a React functional component with Tailwind CSS classes. Use TypeScript types.",
-            "language": "jsx",
-        },
-        "vue": {
-            "name": "Vue 3",
-            "prompt": "Generate a Vue 3 component using Composition API and <script setup>.",
-            "language": "javascript",
-        },
-        "svelte": {
-            "name": "Svelte",
-            "prompt": "Generate a Svelte component with scoped styles.",
-            "language": "javascript",
-        },
-    }
-    
-    def get_system_prompt(self, framework: str = "html") -> str:
-        fw_info = self.FRAMEWORKS.get(framework, self.FRAMEWORKS["html"])
-        return f"You are an expert frontend developer. {fw_info['prompt']} Output only the code, no explanations."
-    
-    def get_framework_info(self, framework: str) -> Dict[str, str]:
-        fw_info = self.FRAMEWORKS.get(framework, self.FRAMEWORKS["html"])
-        return {"name": fw_info["name"], "language": fw_info["language"]}
-    
-    def clean_code_response(self, text: str) -> str:
-        import re
-        text = re.sub(r'^```[\w]*\n?', '', text)
-        text = re.sub(r'\n?```$', '', text)
-        return text.strip()
+    """Processor that turns UI screenshots into front-end code."""
+
+    def get_system_prompt(self, framework: str) -> str:
+        framework_description = SUPPORTED_FRAMEWORKS.get(
+            framework, SUPPORTED_FRAMEWORKS["html"]
+        )
+        return (
+            "You are a front-end engineer. Look at this UI screenshot and "
+            f"produce a faithful implementation in {framework_description}. "
+            "Output ONLY the code in a single fenced code block. No commentary, "
+            "no explanation, no setup instructions. Just the code."
+        )
+
+    async def process(
+        self,
+        image_b64: str,
+        framework: str,
+        custom_system_prompt: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncGenerator[StreamChunk, None]:
+        system_prompt = (
+            custom_system_prompt
+            if custom_system_prompt and custom_system_prompt.strip()
+            else self.get_system_prompt(framework)
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Implement this UI."},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                    },
+                ],
+            },
+        ]
+        client = get_client()
+        async for chunk in client.stream_completion(
+            messages,
+            api_key=api_key,
+            model=model,
+            backend=backend,
+        ):
+            yield chunk

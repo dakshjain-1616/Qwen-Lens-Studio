@@ -66,6 +66,21 @@ export default function Sidebar() {
             )}
           </NavLink>
         ))}
+        <NavLink
+          to="/batch"
+          className={({ isActive }) =>
+            `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              isActive
+                ? 'bg-white/10 text-white shadow-inner'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+            }`
+          }
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-gradient-to-br from-sky-500 to-indigo-500">
+            ▦
+          </span>
+          <span>Batch</span>
+        </NavLink>
       </nav>
 
       <div className="mt-auto flex flex-col gap-3">

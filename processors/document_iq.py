@@ -1,63 +1,68 @@
-"""Document IQ Processor for structured document extraction."""
+"""Document IQ Processor - extracts structured JSON from document images."""
+from typing import AsyncGenerator, Optional
 
-import json
-import re
-from typing import Dict, Any, Optional
+from qwen_client import get_client, StreamChunk
 
 
 class DocumentIQProcessor:
-    """Processor for extracting structured data from document images."""
-    
-    def __init__(self):
-        self.system_prompt = (
-            "You are a document intelligence system. Analyze this document image and extract all "
-            "information as valid JSON. Include: document_type, extracted_fields (key-value pairs), "
-            "tables (if any), dates, monetary_amounts, and confidence_score (0-1). "
-            "Respond ONLY with valid JSON, no markdown wrapping."
-        )
-    
+    """Processor for document/form/invoice structured extraction."""
+
     def get_system_prompt(self) -> str:
-        """Get system prompt for document extraction."""
-        return self.system_prompt
-    
-    def extract_json(self, text: str) -> Optional[Dict[str, Any]]:
-        """Extract JSON from response, handling markdown fences."""
-        # Try to find JSON in markdown fences
-        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
-        if json_match:
-            text = json_match.group(1)
-        
-        # Try to find JSON directly
-        json_match = re.search(r'(\{.*\})', text, re.DOTALL)
-        if json_match:
-            text = json_match.group(1)
-        
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return None
-    
-    def format_response(self, extracted_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format the extracted document data."""
-        document_type = extracted_data.get("document_type", "unknown")
-        confidence = extracted_data.get("confidence_score", 0.0)
-        
-        return {
-            "document_type": document_type,
-            "confidence_score": confidence,
-            "extracted_data": extracted_data,
-            "badge_color": self._get_badge_color(document_type),
-        }
-    
-    def _get_badge_color(self, doc_type: str) -> str:
-        """Get color for document type badge."""
-        colors = {
-            "invoice": "#10b981",  # green
-            "receipt": "#3b82f6",  # blue
-            "business_card": "#8b5cf6",  # purple
-            "form": "#f59e0b",  # amber
-            "id_card": "#ef4444",  # red
-            "contract": "#6366f1",  # indigo
-            "resume": "#14b8a6",  # teal
-        }
-        return colors.get(doc_type.lower(), "#6b7280")  # gray default
+        return (
+            "You are a precise document understanding assistant. Look at the "
+            "provided document image (invoice, receipt, ID, form, etc.) and "
+            "extract all structured data as JSON.\n\n"
+            "Rules:\n"
+            "- Output ONLY a single fenced JSON block: ```json ... ```. No prose "
+            "outside the fence.\n"
+            "- Use keys appropriate to the document type:\n"
+            "  * invoices/receipts: invoice_number, date, vendor, line_items "
+            "(list of {description, quantity, unit_price, amount}), subtotal, "
+            "tax, total, currency, payment_terms\n"
+            "  * IDs: document_type, full_name, date_of_birth, id_number, "
+            "issue_date, expiry_date, issuing_authority, address\n"
+            "  * forms: form_title, fields (object of field_name -> value)\n"
+            "- Include a top-level \"document_type\" field.\n"
+            "- If a field is not visible, use null. Do not invent values.\n"
+            "- If the document doesn't match a known schema, fall back to a "
+            "flat key-value extraction of every visible field."
+        )
+
+    async def process(
+        self,
+        image_b64: str,
+        custom_system_prompt: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncGenerator[StreamChunk, None]:
+        system_prompt = (
+            custom_system_prompt
+            if custom_system_prompt and custom_system_prompt.strip()
+            else self.get_system_prompt()
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Extract all structured data from this document as JSON.",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                    },
+                ],
+            },
+        ]
+        client = get_client()
+        async for chunk in client.stream_completion(
+            messages,
+            api_key=api_key,
+            model=model,
+            backend=backend,
+        ):
+            yield chunk

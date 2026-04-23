@@ -27,7 +27,7 @@ export default function ThinkingPane({
         <span className="text-amber-300/60 text-sm">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-1 text-sm text-amber-100/80 font-mono whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
+        <div className="px-4 pb-4 pt-1 text-sm text-amber-100/80 font-mono whitespace-pre-wrap leading-relaxed max-h-[480px] overflow-y-auto">
           {text}
         </div>
       )}

@@ -1,85 +1,239 @@
+"""
+Qwen Client for OpenRouter API with SSE streaming support.
+Handles thinking trace parsing and mock mode for testing.
+"""
 import os
 import json
-import httpx
 import asyncio
-from typing import AsyncGenerator, List, Dict, Any, Optional
+from typing import AsyncGenerator, Optional, Dict, Any
+from dataclasses import dataclass
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
+@dataclass
+class StreamChunk:
+    """Represents a chunk of streamed response."""
+    content: str = ""
+    thinking: str = ""
+    is_thinking: bool = False
+    is_complete: bool = False
+    error: Optional[str] = None
+
+
 class QwenClient:
+    """Client for Qwen model via OpenRouter API."""
+    
     def __init__(self):
-        self.api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("MODEL_ID") or os.getenv("QWEN_MODEL") or "qwen/qwen3.6-plus"
+        self.api_key = os.getenv("OPENROUTER_API_KEY", "")
+        self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        self.model = os.getenv("QWEN_MODEL", "qwen/qwen3.6-35b-a3b")
         self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
-        self.backend = os.getenv("BACKEND", "openrouter").lower() # openrouter, ollama, llamacpp
         
-        self.base_urls = {
-            "openrouter": "https://openrouter.ai/api/v1",
-            "ollama": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
-            "llamacpp": os.getenv("LLAMACPP_BASE_URL", "http://localhost:8080/v1")
-        }
+        if not self.mock_mode and not self.api_key:
+            raise ValueError("OPENROUTER_API_KEY is required when MOCK_MODE is false")
+    
+    def _parse_thinking_content(self, content: str) -> tuple[str, str]:
+        """
+        Parse thinking content from response.
+        Returns (visible_content, thinking_content)
+        """
+        thinking = ""
+        visible = content
         
-    async def stream_chat(
-        self, 
-        messages: List[Dict[str, Any]], 
-        enable_thinking: bool = False
-    ) -> AsyncGenerator[str, None]:
+        # Look for thinking tags
+        if "<think>" in content and "</think>" in content:
+            start = content.find("<think>")
+            end = content.find("</think>") + len("</think>")
+            thinking = content[start + len("<think>"):end - len("</think>")]
+            visible = content[:start] + content[end:]
+        
+        return visible.strip(), thinking.strip()
+    
+    async def _mock_stream(self, messages: list, **kwargs) -> AsyncGenerator[StreamChunk, None]:
+        """Generate mock streaming responses for testing."""
+        mock_thinking = "Let me analyze this step by step...\n\n1. First, I need to understand the context\n2. Then, I'll formulate a response\n3. Finally, I'll provide the answer"
+        
+        mock_response = "This is a mock response from the Qwen model. In production mode, this would be a real response from the OpenRouter API using the Qwen3.6-35B-A3B model."
+        
+        # Stream thinking first
+        for line in mock_thinking.split('\n'):
+            await asyncio.sleep(0.1)
+            yield StreamChunk(thinking=line + '\n', is_thinking=True)
+        
+        # Stream response
+        words = mock_response.split()
+        for i, word in enumerate(words):
+            await asyncio.sleep(0.05)
+            content = word + (' ' if i < len(words) - 1 else '')
+            yield StreamChunk(content=content)
+        
+        yield StreamChunk(is_complete=True)
+    
+    async def stream_completion(
+        self,
+        messages: list,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = None,
+        **kwargs
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Stream completion from Qwen model.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            api_key: Optional per-call API key override
+            model: Optional per-call model override
+            backend: Optional backend type (openrouter/ollama/llamacpp)
+            
+        Yields:
+            StreamChunk objects containing content or thinking
+        """
+        # Use per-call overrides if provided, otherwise fall back to instance defaults
+        effective_api_key = api_key if api_key else self.api_key
+        effective_model = model if model else self.model
+        
         if self.mock_mode:
-            async for chunk in self._mock_stream(enable_thinking):
+            async for chunk in self._mock_stream(messages, **kwargs):
                 yield chunk
             return
-
-        url = f"{self.base_urls.get(self.backend, self.base_urls['openrouter'])}/chat/completions"
+        
+        if not effective_api_key:
+            yield StreamChunk(error="API key is required. Set OPENROUTER_API_KEY or provide via X-OpenRouter-Key header.")
+            return
+        
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {effective_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://qwen-lens-studio.local",
+            "X-Title": "Qwen Lens Studio"
         }
         
         payload = {
-            "model": self.model,
+            "model": effective_model,
             "messages": messages,
-            "stream": True
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+            **kwargs
         }
         
-        if enable_thinking and self.backend == "openrouter":
-            payload["provider"] = {"require_parameters": True}
-            payload["enable_thinking"] = True
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", url, headers=headers, json=payload) as response:
-                if response.status_code != 200:
-                    error_text = await response.aread()
-                    raise Exception(f"API Error ({response.status_code}): {error_text.decode()}")
-                
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            data = json.loads(data_str)
-                            choices = data.get("choices") or []
-                            if not choices:
-                                continue
-                            delta = choices[0].get("delta") or {}
-                            chunk = delta.get("content") or ""
-                            if chunk:
-                                yield chunk
-                        except (json.JSONDecodeError, KeyError, IndexError):
+        try:
+            async with httpx.AsyncClient() as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=60.0
+                ) as response:
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        yield StreamChunk(
+                            error=f"API Error {response.status_code}: {error_text.decode()}"
+                        )
+                        return
+                    
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
                             continue
-
-    async def _mock_stream(self, enable_thinking: bool) -> AsyncGenerator[str, None]:
-        if enable_thinking:
-            yield "<|im_start|>think\n"
-            await asyncio.sleep(0.1)
-            yield "Analyzing the visual elements of the image...\n"
-            await asyncio.sleep(0.1)
-            yield "Identifying key objects and their spatial relationships.\n"
-            await asyncio.sleep(0.1)
-            yield "<|im_end|>\n"
+                        
+                        data = line[6:]  # Remove "data: " prefix
+                        
+                        if data == "[DONE]":
+                            yield StreamChunk(is_complete=True)
+                            break
+                        
+                        try:
+                            event = json.loads(data)
+                            delta = event.get("choices", [{}])[0].get("delta", {})
+                            
+                            content = delta.get("content", "")
+                            reasoning = delta.get("reasoning", "")
+                            
+                            if reasoning:
+                                yield StreamChunk(thinking=reasoning, is_thinking=True)
+                            
+                            if content:
+                                # Check for thinking tags in content
+                                visible, thinking = self._parse_thinking_content(content)
+                                if thinking:
+                                    yield StreamChunk(thinking=thinking, is_thinking=True)
+                                if visible:
+                                    yield StreamChunk(content=visible)
+                            
+                        except json.JSONDecodeError:
+                            continue
+                            
+        except httpx.TimeoutException:
+            yield StreamChunk(error="Request timed out. Please try again.")
+        except Exception as e:
+            yield StreamChunk(error=f"Error: {str(e)}")
+    
+    async def complete(
+        self,
+        messages: list,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Non-streaming completion.
         
-        text = "This is a simulated response from Qwen3.6 in mock mode. It demonstrates the streaming capability of the studio."
-        for word in text.split():
-            yield word + " "
-            await asyncio.sleep(0.05)
+        Args:
+            messages: List of message dicts
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            api_key: Optional per-call API key override
+            model: Optional per-call model override
+            backend: Optional backend type
+            
+        Returns:
+            Dict with 'content', 'thinking', and 'error' keys
+        """
+        content_parts = []
+        thinking_parts = []
+        error = None
+        
+        async for chunk in self.stream_completion(messages, temperature, max_tokens, api_key, model, backend, **kwargs):
+            if chunk.error:
+                error = chunk.error
+                break
+            if chunk.content:
+                content_parts.append(chunk.content)
+            if chunk.thinking:
+                thinking_parts.append(chunk.thinking)
+        
+        return {
+            "content": "".join(content_parts),
+            "thinking": "".join(thinking_parts),
+            "error": error
+        }
+
+
+# Singleton instance
+_client: Optional[QwenClient] = None
+
+
+def get_client() -> QwenClient:
+    """Get or create singleton QwenClient instance."""
+    global _client
+    if _client is None:
+        _client = QwenClient()
+    return _client
+
+
+def reset_client():
+    """Reset the singleton client (useful for testing)."""
+    global _client
+    _client = None

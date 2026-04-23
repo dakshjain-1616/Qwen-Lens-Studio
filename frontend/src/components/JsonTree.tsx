@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import ReadOnlyEditor from './ReadOnlyEditor';
 
 function tryParse(raw: string): unknown {
   const trimmed = raw.trim();
@@ -136,13 +137,11 @@ export default function JsonTree({ text }: { text: string }) {
         </div>
       </div>
       {view === 'tree' && parsed ? (
-        <div className="p-4 font-mono text-sm max-h-[480px] overflow-auto leading-relaxed">
+        <div className="p-4 font-mono text-sm max-h-[720px] overflow-auto leading-relaxed">
           <Node value={parsed} depth={0} />
         </div>
       ) : (
-        <pre className="m-0 p-4 text-sm font-mono text-slate-200 overflow-auto max-h-[480px] whitespace-pre-wrap">
-          {pretty}
-        </pre>
+        <ReadOnlyEditor value={pretty} language="json" />
       )}
     </div>
   );
